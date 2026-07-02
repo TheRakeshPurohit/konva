@@ -172,6 +172,56 @@ describe('Arc', function () {
     });
   });
 
+  it('getSelfRect on zero angle clockwise arc should be degenerate, not a full circle', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+    var arc = new Konva.Arc({
+      x: 100,
+      y: 100,
+      innerRadius: 30,
+      outerRadius: 80,
+      angle: 0,
+      clockwise: true,
+    });
+
+    layer.add(arc);
+    stage.add(layer);
+
+    // an angle of 0 draws nothing (context.arc with startAngle === endAngle),
+    // same as the counter-clockwise case below - it must not be reported as
+    // a full circle just because the 360 - angle flip used internally for
+    // clockwise arcs lands on 2*PI.
+    assertAlmostDeepEqual(arc.getSelfRect(), {
+      x: 30,
+      y: 0,
+      width: 50,
+      height: 0,
+    });
+  });
+
+  it('getSelfRect on zero angle counter-clockwise arc matches the clockwise case', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+    var arc = new Konva.Arc({
+      x: 100,
+      y: 100,
+      innerRadius: 30,
+      outerRadius: 80,
+      angle: 0,
+      clockwise: false,
+    });
+
+    layer.add(arc);
+    stage.add(layer);
+
+    assertAlmostDeepEqual(arc.getSelfRect(), {
+      x: 30,
+      y: 0,
+      width: 50,
+      height: 0,
+    });
+  });
+
   it('cache', function () {
     var stage = addStage();
     var layer = new Konva.Layer();

@@ -66,6 +66,27 @@ export class Arc extends Shape<ArcConfig> {
     const innerRadius = this.innerRadius();
     const outerRadius = this.outerRadius();
     const clockwise = this.clockwise();
+
+    // a raw angle that is a non-zero multiple of a full turn is a degenerate case:
+    // _sceneFunc draws it with `context.arc(0, 0, r, 0, angle, clockwise)`, and per
+    // the canvas spec that only sweeps a full circle when the turn direction implied
+    // by the angle's sign matches `clockwise` (native `counterclockwise` flag) -
+    // otherwise it's a zero-length arc, same as angle === 0. The 360 - angle flip
+    // below can't tell these two outcomes apart (it always lands on 0 or 2*PI), so
+    // it must be special-cased here instead of falling through to the trig formula.
+    const rawAngle = Konva.getAngle(this.angle());
+    if (rawAngle % (Math.PI * 2) === 0) {
+      const isFullCircle = rawAngle !== 0 && rawAngle > 0 !== clockwise;
+      return isFullCircle
+        ? {
+            x: -outerRadius,
+            y: -outerRadius,
+            width: outerRadius * 2,
+            height: outerRadius * 2,
+          }
+        : { x: innerRadius, y: 0, width: outerRadius - innerRadius, height: 0 };
+    }
+
     const angle = Konva.getAngle(clockwise ? 360 - this.angle() : this.angle());
 
     const boundLeftRatio = Math.cos(Math.min(angle, Math.PI));
