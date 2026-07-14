@@ -656,6 +656,10 @@ export class Shape<
         bufferContext.clear();
       }
       bufferContext.save();
+      // the buffer canvas is a separate context that does not inherit the
+      // destination `imageSmoothingEnabled` flag, so propagate it to keep
+      // pattern/image smoothing consistent with the target context.
+      bufferContext.imageSmoothingEnabled = context.imageSmoothingEnabled;
       bufferContext._applyLineJoin(this);
       bufferContext._applyMiterLimit(this);
       // layer might be undefined if we are using cache before adding to layer

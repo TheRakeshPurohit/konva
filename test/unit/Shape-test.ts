@@ -303,6 +303,71 @@ describe('Shape', function () {
   });
 
   // ======================================================
+  it('fillPatternImage should respect imageSmoothingEnabled', function () {
+    // build a tiny 2x2 checker pattern (white / black)
+    const patternCanvas = Konva.Util.createCanvasElement();
+    patternCanvas.width = 2;
+    patternCanvas.height = 2;
+    const pctx = patternCanvas.getContext('2d')!;
+    pctx.fillStyle = 'black';
+    pctx.fillRect(0, 0, 2, 2);
+    pctx.fillStyle = 'white';
+    pctx.fillRect(0, 0, 1, 1);
+    pctx.fillRect(1, 1, 1, 1);
+
+    // scan a horizontal row of the rendered pattern and collect the
+    // R channel values of the pixels that sit around a source-pixel boundary
+    function renderRow(smoothing: boolean) {
+      const stage = addStage();
+      const layer = new Konva.Layer({ imageSmoothingEnabled: smoothing });
+      stage.add(layer);
+      const rect = new Konva.Rect({
+        x: 0,
+        y: 0,
+        width: 120,
+        height: 120,
+        fillPatternImage: patternCanvas,
+        fillPatternScaleX: 40,
+        fillPatternScaleY: 40,
+      });
+      layer.add(rect);
+      layer.draw();
+
+      const ctx = layer.getCanvas().getContext()._context;
+      const pr = layer.getCanvas().getPixelRatio();
+      const y = Math.floor(1 * pr);
+      const width = Math.floor(100 * pr);
+      const data = ctx.getImageData(0, y, width, 1).data;
+      const reds: number[] = [];
+      for (let i = 0; i < width; i++) {
+        reds.push(data[i * 4]);
+      }
+      return reds;
+    }
+
+    // when smoothing is disabled every pixel must be a pure source pixel:
+    // either fully white (255) or fully black (0), never a blended value.
+    const sharpReds = renderRow(false);
+    const blended = sharpReds.filter((r) => r > 20 && r < 235);
+    assert.equal(
+      blended.length,
+      0,
+      'with imageSmoothingEnabled=false pattern must not be blurred, got blended pixels: ' +
+        blended.join(',')
+    );
+
+    // sanity: with smoothing enabled the same scaled pattern IS blurred,
+    // so blended pixels should appear around the boundaries.
+    const smoothReds = renderRow(true);
+    const smoothBlended = smoothReds.filter((r) => r > 20 && r < 235);
+    assert.isAbove(
+      smoothBlended.length,
+      0,
+      'with imageSmoothingEnabled=true the scaled pattern should be blurred'
+    );
+  });
+
+  // ======================================================
   it('set image fill to color then image then linear gradient then back to image', function (done) {
     loadImage('darth-vader.jpg', (imageObj) => {
       var stage = addStage();

@@ -842,6 +842,18 @@ export class SceneContext extends Context {
     shape._fillFunc(this);
   }
   _fillPattern(shape: Shape) {
+    // `imageSmoothingEnabled` (set on the layer/context) controls pattern
+    // smoothing in the browser. node-canvas ignores it for pattern fills and
+    // instead exposes a non-standard `patternQuality` property, so mirror the
+    // current smoothing setting onto it to keep both backends consistent.
+    const context = this._context as CanvasRenderingContext2D & {
+      patternQuality?: string;
+    };
+    if ('patternQuality' in context) {
+      context.patternQuality = context.imageSmoothingEnabled
+        ? 'good'
+        : 'nearest';
+    }
     this.setAttr('fillStyle', shape._getFillPattern());
     shape._fillFunc(this);
   }
