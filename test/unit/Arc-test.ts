@@ -222,6 +222,34 @@ describe('Arc', function () {
     });
   });
 
+  it('getSelfRect on full angle arc is a full circle in both directions', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+
+    // canvas renders a full circle for a 360 end angle in either direction,
+    // so both must report the full bounding box
+    [true, false].forEach(function (clockwise) {
+      var arc = new Konva.Arc({
+        x: 100,
+        y: 100,
+        innerRadius: 30,
+        outerRadius: 80,
+        angle: 360,
+        clockwise: clockwise,
+      });
+
+      layer.add(arc);
+      stage.add(layer);
+
+      assertAlmostDeepEqual(arc.getSelfRect(), {
+        x: -80,
+        y: -80,
+        width: 160,
+        height: 160,
+      });
+    });
+  });
+
   it('cache', function () {
     var stage = addStage();
     var layer = new Konva.Layer();
