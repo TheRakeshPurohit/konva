@@ -356,6 +356,13 @@ describe('Shape', function () {
         blended.join(',')
     );
 
+    // skia-canvas never smooths pattern fills (regardless of
+    // imageSmoothingEnabled), so the smoothing sanity check below
+    // can't pass on that backend.
+    if (Konva._renderBackend === 'skia-canvas') {
+      return;
+    }
+
     // sanity: with smoothing enabled the same scaled pattern IS blurred,
     // so blended pixels should appear around the boundaries.
     const smoothReds = renderRow(true);
