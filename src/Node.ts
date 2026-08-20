@@ -796,6 +796,15 @@ export abstract class Node<Config extends NodeConfig = NodeConfig> {
 
     return filterCanvas;
   }
+  on<K extends keyof NodeEventMap>(
+    evtStr: K,
+    handler: KonvaEventListener<this, NodeEventMap[K]>
+  ): this;
+  on<K extends keyof NodeEventMap>(
+    evtStr: K,
+    selector: string,
+    handler: KonvaEventListener<Node, NodeEventMap[K]>
+  ): this;
   /**
    * bind events to the node. KonvaJS supports mouseover, mousemove,
    *  mouseout, mouseenter, mouseleave, mousedown, mouseup, wheel, contextmenu, click, dblclick, touchstart, touchmove,
@@ -857,15 +866,6 @@ export abstract class Node<Config extends NodeConfig = NodeConfig> {
    *   var group = evt.currentTarget;
    * });
    */
-  on<K extends keyof NodeEventMap>(
-    evtStr: K,
-    handler: KonvaEventListener<this, NodeEventMap[K]>
-  ): this;
-  on<K extends keyof NodeEventMap>(
-    evtStr: K,
-    selector: string,
-    handler: KonvaEventListener<Node, NodeEventMap[K]>
-  ): this;
   on(...args: any[]): this {
     const evtStr = args[0];
     const selectorOrHandler = args[1];
