@@ -15,16 +15,6 @@ type DragElement = {
   dragStatus: 'ready' | 'dragging' | 'stopped';
 };
 
-class DragElementMap extends Map<number, DragElement> {
-  set(key: number, elem: DragElement) {
-    const ownerWindow =
-      elem.node.getStage()?.content?.ownerDocument?.defaultView;
-    DD._listenToWindow(ownerWindow);
-
-    return super.set(key, elem);
-  }
-}
-
 export const DD = {
   get isDragging() {
     let flag = false;
@@ -44,36 +34,42 @@ export const DD = {
     });
     return node;
   },
-  _dragElements: new DragElementMap(),
-  _listeningWindows: new WeakSet<Window>(),
+  _dragElements: new Map<number, DragElement>(),
 
-  _listenToWindow(win?: Window | null) {
-    if (!win || DD._listeningWindows.has(win)) {
-      return;
-    }
+  // Konva is imported into one window, but a stage may be rendered in another
+  // one: an iframe, or a window opened with `window.open`. Such a window sends
+  // its pointer events to itself, so `Konva.Stage` asks for every window it is
+  // rendered in. The handlers get the window they listen to, as only that
+  // window has pointer positions the stages of that window can use
+  _listenToWindow(win: Window) {
+    const endDragBefore = (evt) => DD._endDragBefore(evt, win);
+    const drag = (evt) => DD._drag(evt, win);
 
-    win.addEventListener('mouseup', DD._endDragBefore, true);
-    win.addEventListener('touchend', DD._endDragBefore, true);
+    win.addEventListener('mouseup', endDragBefore, true);
+    win.addEventListener('touchend', endDragBefore, true);
     // add touchcancel to fix this: https://github.com/konvajs/konva/issues/1843
-    win.addEventListener('touchcancel', DD._endDragBefore, true);
+    win.addEventListener('touchcancel', endDragBefore, true);
 
-    win.addEventListener('mousemove', DD._drag);
-    win.addEventListener('touchmove', DD._drag);
+    win.addEventListener('mousemove', drag);
+    win.addEventListener('touchmove', drag);
 
     win.addEventListener('mouseup', DD._endDragAfter, false);
     win.addEventListener('touchend', DD._endDragAfter, false);
     win.addEventListener('touchcancel', DD._endDragAfter, false);
-
-    DD._listeningWindows.add(win);
   },
 
   // methods
-  _drag(evt) {
+  _drag(evt, win?: Window) {
     const nodesToFireEvents: Array<Node> = [];
     DD._dragElements.forEach((elem, key) => {
       const { node } = elem;
       // we need to find pointer relative to that node
       const stage = node.getStage()!;
+      // a pointer position of another window is relative to another viewport,
+      // it would drag the node to a random place
+      if (win && stage._getOwnerWindow() !== win) {
+        return;
+      }
       stage.setPointersPositions(evt);
 
       // it is possible that user call startDrag without any event
@@ -127,13 +123,15 @@ export const DD = {
 
   // dragBefore and dragAfter allows us to set correct order of events
   // setup all in dragbefore, and stop dragging only after pointerup triggered.
-  _endDragBefore(evt?) {
+  _endDragBefore(evt?, win?: Window) {
     const drawNodes: Array<Container> = [];
     DD._dragElements.forEach((elem) => {
       const { node } = elem;
       // we need to find pointer relative to that node
       const stage = node.getStage()!;
-      if (evt) {
+      // a pointer released in another window ends the drag too - the pointer
+      // is up everywhere - but its position is not used for this stage
+      if (evt && (!win || stage._getOwnerWindow() === win)) {
         stage.setPointersPositions(evt);
       }
 
@@ -189,7 +187,3 @@ export const DD = {
     });
   },
 };
-
-if (Konva.isBrowser) {
-  DD._listenToWindow(window);
-}

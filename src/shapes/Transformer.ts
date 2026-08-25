@@ -252,6 +252,9 @@ export class Transformer extends Group {
   _nodes: Array<Node>;
   _movingAnchorName: string | null = null;
   _transforming = false;
+  // the window the transform events are listened to. The stage may be
+  // rendered in another window than the one Konva was imported into
+  _transformWindow: Window | null = null;
   _anchorDragOffset: Vector2d;
   sin: number;
   cos: number;
@@ -730,11 +733,14 @@ export class Transformer extends Group {
     this.sin = Math.abs(height / hypotenuse);
     this.cos = Math.abs(width / hypotenuse);
 
-    if (typeof window !== 'undefined') {
-      window.addEventListener('mousemove', this._handleMouseMove);
-      window.addEventListener('touchmove', this._handleMouseMove);
-      window.addEventListener('mouseup', this._handleMouseUp, true);
-      window.addEventListener('touchend', this._handleMouseUp, true);
+    // the window that owns the stage is the one that gets the pointer events
+    const win = this.getStage()?._getOwnerWindow();
+    this._transformWindow = win || null;
+    if (win) {
+      win.addEventListener('mousemove', this._handleMouseMove);
+      win.addEventListener('touchmove', this._handleMouseMove);
+      win.addEventListener('mouseup', this._handleMouseUp, true);
+      win.addEventListener('touchend', this._handleMouseUp, true);
     }
 
     this._transforming = true;
@@ -1007,11 +1013,13 @@ export class Transformer extends Group {
   _removeEvents(e?) {
     if (this._transforming) {
       this._transforming = false;
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('mousemove', this._handleMouseMove);
-        window.removeEventListener('touchmove', this._handleMouseMove);
-        window.removeEventListener('mouseup', this._handleMouseUp, true);
-        window.removeEventListener('touchend', this._handleMouseUp, true);
+      const win = this._transformWindow;
+      this._transformWindow = null;
+      if (win) {
+        win.removeEventListener('mousemove', this._handleMouseMove);
+        win.removeEventListener('touchmove', this._handleMouseMove);
+        win.removeEventListener('mouseup', this._handleMouseUp, true);
+        win.removeEventListener('touchend', this._handleMouseUp, true);
       }
       const node = this.getNode();
       activeTransformersCount--;

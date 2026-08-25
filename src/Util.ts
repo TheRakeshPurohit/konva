@@ -442,16 +442,24 @@ const OBJECT_ARRAY = '[object Array]',
     yellow: [255, 255, 0],
     yellowgreen: [154, 205, 50],
   };
-let animQueue: Array<Function> = [];
-
 // Cache for canvas farbling detection
 let _isCanvasFarblingActive: boolean | null = null;
 
-const req =
-  (typeof requestAnimationFrame !== 'undefined' && requestAnimationFrame) ||
-  function (f) {
+// A stage may be rendered in another window than the one Konva was imported
+// into, and a window that is not visible gives almost no frames. So frames are
+// asked from the window of the stage, and the callbacks are kept per window
+const defaultWindow: any = typeof window !== 'undefined' ? window : {};
+const animQueues = new WeakMap<object, Array<Function>>();
+
+const requestFrame = (win: any, f: Function) => {
+  if (typeof win.requestAnimationFrame === 'function') {
+    win.requestAnimationFrame(f);
+  } else if (typeof requestAnimationFrame !== 'undefined') {
+    requestAnimationFrame(f as any);
+  } else {
     setTimeout(f, 16); // 60fps ≈ 16.67ms per frame
-  };
+  }
+};
 const capitalizeCache = new Map<string, string>();
 
 // Split the components of rgb()/hsl(). CSS separates them with commas (legacy
@@ -561,17 +569,20 @@ export const Util = {
     }
   },
 
-  requestAnimFrame(callback: Function) {
-    animQueue.push(callback);
-    if (animQueue.length === 1) {
-      req(function () {
-        const queue = animQueue;
-        animQueue = [];
-        queue.forEach(function (cb) {
+  requestAnimFrame(callback: Function, win?: Window | null) {
+    const target: any = (win && !win.closed && win) || defaultWindow;
+    let queue = animQueues.get(target);
+    if (!queue) {
+      queue = [];
+      animQueues.set(target, queue);
+      requestFrame(target, function () {
+        animQueues.delete(target);
+        queue!.forEach(function (cb) {
           cb();
         });
       });
     }
+    queue.push(callback);
   },
   createCanvasElement() {
     ensureBrowser();
@@ -587,12 +598,9 @@ export const Util = {
     return document.createElement('img');
   },
   _isInDocument(el: any) {
-    while ((el = el.parentNode)) {
-      if (el == document) {
-        return true;
-      }
-    }
-    return false;
+    // not `el.parentNode == document`, because the element may belong to
+    // another document: an iframe, or a popout window
+    return !!el.isConnected;
   },
 
   /*
