@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## Unreleased
+
+- Fixed drag and drop of a stage rendered in another window than the one Konva was imported into - an iframe, or a window opened with `window.open`. Such a stage now uses the pointer events of its own window, and a pointer move in another window no longer drags its nodes
+- Fixed `Transformer` of such a stage, which got no pointer move or release events at all
+- Fixed `layer.batchDraw()` of such a stage, which asked the window Konva was imported into for the frame and stopped drawing when that window was not visible
+- Fixed `stage.destroy()` leaving the content of such a stage in the container
+
 ## 10.3.1 (2026-08-14)
 
 - Added `hsla()` support and the space-separated CSS Color 4 syntax to `Konva.Util.colorToRGBA()`

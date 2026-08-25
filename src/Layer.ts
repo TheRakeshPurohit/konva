@@ -299,10 +299,12 @@ export class Layer extends Container<Group | Shape> {
   batchDraw() {
     if (!this._waitingForDraw) {
       this._waitingForDraw = true;
+      // ask the window the stage is rendered in for the frame: a stage in a
+      // popout window keeps drawing while the opener window is not visible
       Util.requestAnimFrame(() => {
         this.draw();
         this._waitingForDraw = false;
-      });
+      }, this.getStage()?._getOwnerWindow());
     }
     return this;
   }

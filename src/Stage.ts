@@ -138,6 +138,29 @@ const NO_POINTERS_MESSAGE = `Pointer position is missing and not registered by t
 
 export const stages: Stage[] = [];
 
+// A stage may be rendered in another window than the one Konva was imported
+// into: an iframe, or a window opened with `window.open`. Such a window sends
+// its own events and has its own visibility state, so Konva listens to every
+// window it renders a stage in
+const listeningWindows = new WeakSet<Window>();
+
+const listenToWindow = (win: Window | null) => {
+  if (!win || listeningWindows.has(win)) {
+    return;
+  }
+  listeningWindows.add(win);
+  DD._listenToWindow(win);
+  // chrome is clearing canvas in inactive browser window, causing layer content to be erased
+  // so let's redraw layers as soon as window becomes active
+  // TODO: any other way to solve this issue?
+  // TODO: should we remove it if chrome fixes the issue?
+  win.document.addEventListener('visibilitychange', () => {
+    stages.forEach((stage) => {
+      stage.batchDraw();
+    });
+  });
+};
+
 /**
  * Stage constructor.  A stage is used to contain multiple layers
  * @constructor
@@ -209,6 +232,19 @@ export class Stage extends Container<Layer, StageConfig> {
     this.content.style.display = style;
   }
   /**
+   * The window the stage is rendered in. It is not always the window Konva was
+   * imported into: the container may belong to an iframe, or to a window
+   * opened with `window.open`.
+   */
+  _getOwnerWindow(): Window | null {
+    const element = this.content || this.container();
+    // a document with no browsing context, such as one of `DOMParser`, has no
+    // window of its own. The window Konva was imported into is used then
+    return (
+      element?.ownerDocument?.defaultView || (Konva.isBrowser ? window : null)
+    );
+  }
+  /**
    * set container dom element which contains the stage wrapper div element
    * @method
    * @name Konva.Stage#setContainer
@@ -238,6 +274,8 @@ export class Stage extends Container<Layer, StageConfig> {
         this.content.parentElement.removeChild(this.content);
       }
       container.appendChild(this.content);
+      // the new container may be in another window, with its own events
+      listenToWindow(this._getOwnerWindow());
     }
     return this;
   }
@@ -932,7 +970,9 @@ export class Stage extends Container<Layer, StageConfig> {
     container.innerHTML = '';
 
     // content
-    this.content = document.createElement('div');
+    // the container may belong to another document - an iframe, or a popout
+    // window - so the content is created in the document of the container
+    this.content = container.ownerDocument.createElement('div');
     this.content.style.position = 'relative';
     this.content.style.userSelect = 'none';
     this.content.className = 'konvajs-content';
@@ -940,6 +980,8 @@ export class Stage extends Container<Layer, StageConfig> {
     this.content.setAttribute('role', 'presentation');
 
     container.appendChild(this.content);
+
+    listenToWindow(this._getOwnerWindow());
 
     this._resizeDOM();
   }
@@ -973,7 +1015,9 @@ Stage.prototype.nodeType = STAGE;
 _registerNode(Stage);
 
 /**
- * get/set container DOM element
+ * get/set container DOM element. The container may belong to another window
+ * than the one Konva was imported into: an iframe, or a window opened with
+ * `window.open`. The stage then uses the events and the frames of that window.
  * @method
  * @name Konva.Stage#container
  * @returns {DomElement} container
@@ -984,17 +1028,9 @@ _registerNode(Stage);
  * var container = document.createElement('div');
  * body.appendChild(container);
  * stage.container(container);
+ *
+ * // a stage in a popout window
+ * var popout = window.open('', '', 'width=600,height=400');
+ * stage.container(popout.document.body);
  */
 Factory.addGetterSetter(Stage, 'container');
-
-// chrome is clearing canvas in inactive browser window, causing layer content to be erased
-// so let's redraw layers as soon as window becomes active
-// TODO: any other way to solve this issue?
-// TODO: should we remove it if chrome fixes the issue?
-if (Konva.isBrowser) {
-  document.addEventListener('visibilitychange', () => {
-    stages.forEach((stage) => {
-      stage.batchDraw();
-    });
-  });
-}
