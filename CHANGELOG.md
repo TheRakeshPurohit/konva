@@ -5,6 +5,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+- Fixed `setPointerCapture()` not capturing the pointer on the stage container, so the stage kept missing pointer events outside of its bounds. A captured pointer now keeps sending `pointermove`/`pointerup` to the stage beyond its edges, like pointer capture on plain HTML elements
 - Fixed `pointerclick` firing after a drag and drop, while `click` correctly did not
 - Fixed `Transformer` shaking the shape when a corner anchor with `keepRatio` was dragged across the shape with `padding` enabled
 - Fixed `Transformer` switching its active anchor when `boundBoxFunc` rejects a flip. A rejected flip now keeps the grabbed anchor active, so resizing keeps following the pointer — and `getActiveAnchor()` inside `boundBoxFunc` now reports the anchor being held instead of the prematurely flipped one

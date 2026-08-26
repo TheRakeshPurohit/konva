@@ -2,6 +2,7 @@ import { assert } from 'chai';
 
 import {
   addStage,
+  isNode,
   Konva,
   simulatePointerDown,
   simulatePointerMove,
@@ -222,5 +223,89 @@ describe.skip('PointerEvents', function () {
 
       done();
     }, 17);
+  });
+});
+
+// https://github.com/konvajs/konva/issues/1992
+// setPointerCapture must also capture the pointer on the stage container, so
+// the stage keeps receiving the pointer's events outside of its bounds — like
+// pointer capture on plain HTML elements
+describe('PointerEvents capture wiring', function () {
+  it('setPointerCapture captures and releases on the stage container', function () {
+    if (isNode) {
+      // no DOM pointer capture in node environments
+      return;
+    }
+    var stage = addStage();
+    var layer = new Konva.Layer();
+    var circle = new Konva.Circle({
+      x: 100,
+      y: 100,
+      radius: 70,
+      fill: 'red',
+    });
+    layer.add(circle);
+    stage.add(layer);
+
+    var captured: number[] = [];
+    var released: number[] = [];
+    var gotCapture = 0;
+    var lostCapture = 0;
+    stage.content.setPointerCapture = function (id: number) {
+      captured.push(id);
+    };
+    stage.content.releasePointerCapture = function (id: number) {
+      released.push(id);
+    };
+    circle.on('gotpointercapture', function () {
+      gotCapture += 1;
+    });
+    circle.on('lostpointercapture', function () {
+      lostCapture += 1;
+    });
+
+    circle.setPointerCapture(5);
+    assert.deepEqual(captured, [5], 'should capture on the container');
+    assert.equal(circle.hasPointerCapture(5), true);
+    assert.equal(gotCapture, 1);
+
+    circle.releaseCapture(5);
+    assert.deepEqual(released, [5], 'should release on the container');
+    assert.equal(circle.hasPointerCapture(5), false);
+    assert.equal(lostCapture, 1);
+  });
+
+  it('capture still registers when the container throws for an inactive pointer', function () {
+    if (isNode) {
+      return;
+    }
+    var stage = addStage();
+    var layer = new Konva.Layer();
+    var circle = new Konva.Circle({
+      x: 100,
+      y: 100,
+      radius: 70,
+      fill: 'red',
+    });
+    layer.add(circle);
+    stage.add(layer);
+
+    // the real DOM throws NotFoundError for a pointer id that is not active,
+    // e.g. the fake id 999 of mouse events
+    stage.content.setPointerCapture = function () {
+      throw new Error('NotFoundError');
+    };
+    stage.content.releasePointerCapture = function () {
+      throw new Error('NotFoundError');
+    };
+
+    circle.setPointerCapture(999);
+    assert.equal(
+      circle.hasPointerCapture(999),
+      true,
+      'internal capture must still work'
+    );
+    circle.releaseCapture(999);
+    assert.equal(circle.hasPointerCapture(999), false);
   });
 });

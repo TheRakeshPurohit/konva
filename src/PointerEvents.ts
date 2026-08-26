@@ -38,6 +38,16 @@ export function setPointerCapture(pointerId: number, shape: Shape | Stage) {
   Captures.set(pointerId, shape);
 
   if (SUPPORT_POINTER_EVENTS) {
+    // capture on the DOM level too, so the stage keeps receiving the events
+    // of that pointer even when it moves outside of the stage container
+    // https://github.com/konvajs/konva/issues/1992
+    try {
+      stage.content?.setPointerCapture(pointerId);
+    } catch (e) {
+      // capture is possible only for an active pointer;
+      // ids of mouse and touch events (999 and touch identifiers) and
+      // programmatic calls outside of a pointer event land here
+    }
     shape._fire(
       'gotpointercapture',
       createEvent(new PointerEvent('gotpointercapture'))
@@ -52,13 +62,14 @@ export function releaseCapture(pointerId: number, target?: Shape | Stage) {
 
   const stage = shape.getStage();
 
-  if (stage && stage.content) {
-    // stage.content.releasePointerCapture(pointerId);
-  }
-
   Captures.delete(pointerId);
 
   if (SUPPORT_POINTER_EVENTS) {
+    try {
+      stage?.content?.releasePointerCapture(pointerId);
+    } catch (e) {
+      // same as in setPointerCapture: the pointer may not be active
+    }
     shape._fire(
       'lostpointercapture',
       createEvent(new PointerEvent('lostpointercapture'))
