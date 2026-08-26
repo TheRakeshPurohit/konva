@@ -713,6 +713,14 @@ export class Stage extends Container<Layer, StageConfig> {
       return;
     }
     this.setPointersPositions(evt);
+    // the mouse/touch families get their "listen click" flags reset by
+    // DD._endDragBefore, but native "pointerup" fires before the
+    // "mouseup"/"touchend" that ends the drag, so for the pointer family the
+    // flags are still set — check the live drag state as well, otherwise
+    // "pointerclick" fires after a drag while "click" does not (issue #1756)
+    const wasDragged =
+      DD.justDragged || (eventType === 'pointer' && Konva.isDragging());
+    const listenClick = Konva['_' + eventType + 'ListenClick'] && !wasDragged;
     const clickStartShape = this[eventType + 'ClickStartShape'];
     const clickEndShape = this[eventType + 'ClickEndShape'];
     const processedShapesIds = {};
@@ -736,7 +744,7 @@ export class Stage extends Container<Layer, StageConfig> {
       if (Konva['_' + eventType + 'InDblClickWindow']) {
         fireDblClick = true;
         clearTimeout(this[eventType + 'DblTimeout']);
-      } else if (!DD.justDragged) {
+      } else if (!wasDragged) {
         // don't set inDblClickWindow after dragging
         Konva['_' + eventType + 'InDblClickWindow'] = true;
         clearTimeout(this[eventType + 'DblTimeout']);
@@ -752,11 +760,7 @@ export class Stage extends Container<Layer, StageConfig> {
         shape._fireAndBubble(events.pointerup, { ...event });
 
         // detect if click or double click occurred
-        if (
-          Konva['_' + eventType + 'ListenClick'] &&
-          clickStartShape &&
-          clickStartShape === shape
-        ) {
+        if (listenClick && clickStartShape === shape) {
           shape._fireAndBubble(events.pointerclick, { ...event });
 
           if (fireDblClick && clickEndShape && clickEndShape === shape) {
@@ -776,7 +780,7 @@ export class Stage extends Container<Layer, StageConfig> {
           skipPointerUpTrigger = true;
         }
 
-        if (Konva['_' + eventType + 'ListenClick']) {
+        if (listenClick) {
           this._fire(events.pointerclick, {
             evt: evt,
             target: this,

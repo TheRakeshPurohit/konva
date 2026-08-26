@@ -149,6 +149,9 @@ export const DD = {
         DD.justDragged = true;
         Konva._mouseListenClick = false;
         Konva._touchListenClick = false;
+        // for real pointer input this reset comes too late — "pointerup" fired
+        // before this handler — so Stage._pointerup also checks the live drag
+        // state for the pointer family (issue #1756)
         Konva._pointerListenClick = false;
         elem.dragStatus = 'stopped';
       }
