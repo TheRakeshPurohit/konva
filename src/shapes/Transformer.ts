@@ -1085,6 +1085,20 @@ export class Transformer extends Group {
     // forth on every following move (issue #1878) — so flip only the anchor
     // name, exactly as when padding is 0.
     const flipPadding = anchorProjected ? 0 : this.padding() * 2;
+    // a flip renames the active anchor and shifts the grab offset, but that
+    // bookkeeping is staged and committed only after boundBoxFunc has
+    // accepted the flip: a rejected flip must leave both untouched, or the
+    // transformer keeps resizing from the opposite anchor after the veto
+    // (issue #1967). The staged offset stays in the pre-bound rotation frame
+    // (t), exactly as the immediate shift did before.
+    type StagedFlip = {
+      axis: 'width' | 'height';
+      from: string;
+      to: string;
+      offset: Vector2d;
+    };
+    let widthFlip: StagedFlip | null = null;
+    let heightFlip: StagedFlip | null = null;
     if (
       this._movingAnchorName &&
       newAttrs.width < 0 &&
@@ -1097,9 +1111,7 @@ export class Transformer extends Group {
       newAttrs.x += offset.x;
       newAttrs.y += offset.y;
       newAttrs.width += flipPadding;
-      this._movingAnchorName = this._movingAnchorName.replace('left', 'right');
-      this._anchorDragOffset.x -= offset.x;
-      this._anchorDragOffset.y -= offset.y;
+      widthFlip = { axis: 'width', from: 'left', to: 'right', offset };
     } else if (
       this._movingAnchorName &&
       newAttrs.width < 0 &&
@@ -1109,10 +1121,8 @@ export class Transformer extends Group {
         x: flipPadding,
         y: 0,
       });
-      this._movingAnchorName = this._movingAnchorName.replace('right', 'left');
-      this._anchorDragOffset.x -= offset.x;
-      this._anchorDragOffset.y -= offset.y;
       newAttrs.width += flipPadding;
+      widthFlip = { axis: 'width', from: 'right', to: 'left', offset };
     }
     if (
       this._movingAnchorName &&
@@ -1125,10 +1135,8 @@ export class Transformer extends Group {
       });
       newAttrs.x += offset.x;
       newAttrs.y += offset.y;
-      this._movingAnchorName = this._movingAnchorName.replace('top', 'bottom');
-      this._anchorDragOffset.x -= offset.x;
-      this._anchorDragOffset.y -= offset.y;
       newAttrs.height += flipPadding;
+      heightFlip = { axis: 'height', from: 'top', to: 'bottom', offset };
     } else if (
       this._movingAnchorName &&
       newAttrs.height < 0 &&
@@ -1138,10 +1146,8 @@ export class Transformer extends Group {
         x: 0,
         y: flipPadding,
       });
-      this._movingAnchorName = this._movingAnchorName.replace('bottom', 'top');
-      this._anchorDragOffset.x -= offset.x;
-      this._anchorDragOffset.y -= offset.y;
       newAttrs.height += flipPadding;
+      heightFlip = { axis: 'height', from: 'bottom', to: 'top', offset };
     }
 
     if (this.boundBoxFunc()) {
@@ -1152,6 +1158,19 @@ export class Transformer extends Group {
         Util.warn(
           'boundBoxFunc returned falsy. You should return new bound rect from it!'
         );
+      }
+    }
+
+    // a staged flip survived only if the bounded size is still negative on
+    // its axis
+    for (const flip of [widthFlip, heightFlip]) {
+      if (flip && newAttrs[flip.axis] < 0 && this._movingAnchorName) {
+        this._movingAnchorName = this._movingAnchorName.replace(
+          flip.from,
+          flip.to
+        );
+        this._anchorDragOffset.x -= flip.offset.x;
+        this._anchorDragOffset.y -= flip.offset.y;
       }
     }
 

@@ -50,6 +50,10 @@ function simulateMouseUp(tr: Transformer, pos = { x: 0, y: 0 }) {
   su(stage, pos || { x: 1, y: 1 });
 }
 
+// prevents flipping: rejects any box that crossed zero size
+const rejectNegativeBox = (oldBox: any, newBox: any) =>
+  newBox.width < 0 || newBox.height < 0 ? oldBox : newBox;
+
 describe('Transformer', function () {
   // ======================================================
   it('init transformer on simple rectangle', function () {
@@ -1744,6 +1748,181 @@ describe('Transformer', function () {
     assertAlmostEqual(rect.y(), 100);
     assertAlmostEqual(rect.scaleX(), 1.0107594250783);
     assertAlmostEqual(rect.scaleY(), -1.0107594250783);
+    assertAlmostEqual(rect.rotation(), 0);
+  });
+
+  // https://github.com/konvajs/konva/issues/1967
+  // the anchor rename on a flip used to be committed before boundBoxFunc
+  // could veto the flip, so after the veto the transformer kept resizing
+  // from the opposite anchor
+  it('boundBoxFunc rejecting a flip keeps the active anchor stable', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+    stage.add(layer);
+
+    var rect = new Konva.Rect({
+      x: 100,
+      y: 100,
+      width: 100,
+      height: 100,
+      fill: 'yellow',
+    });
+    layer.add(rect);
+
+    var tr = new Konva.Transformer({
+      nodes: [rect],
+      keepRatio: false,
+      boundBoxFunc: rejectNegativeBox,
+    });
+    layer.add(tr);
+    layer.draw();
+
+    // grab the top-left anchor and drag it right, past the right edge
+    // (collect anchors and assert after mouseup — throwing mid-gesture would
+    // leak global transforming state into the next test)
+    simulateMouseDown(tr, { x: 100, y: 100 });
+    var seenAnchors: Array<string | null> = [];
+    for (var x = 110; x <= 260; x += 10) {
+      simulateMouseMove(tr, { x: x, y: 100 });
+      seenAnchors.push(tr.getActiveAnchor());
+    }
+    simulateMouseUp(tr, { x: 260, y: 100 });
+
+    seenAnchors.forEach((anchor) => {
+      assert.equal(anchor, 'top-left', 'rejected flip must not rename anchor');
+    });
+
+    // the box clamps at the veto point instead of growing from the other side
+    assertAlmostEqual(rect.x(), 190);
+    assertAlmostEqual(rect.y(), 100);
+    assertAlmostEqual(rect.scaleX(), 0.1);
+    assertAlmostEqual(rect.scaleY(), 1);
+  });
+
+  it('flip still renames the anchor when boundBoxFunc keeps it', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+    stage.add(layer);
+
+    var rect = new Konva.Rect({
+      x: 100,
+      y: 100,
+      width: 100,
+      height: 100,
+      fill: 'yellow',
+    });
+    layer.add(rect);
+
+    var tr = new Konva.Transformer({
+      nodes: [rect],
+      keepRatio: false,
+      boundBoxFunc: (oldBox, newBox) => newBox,
+    });
+    layer.add(tr);
+    layer.draw();
+
+    simulateMouseDown(tr, { x: 100, y: 100 });
+    simulateMouseMove(tr, { x: 260, y: 100 });
+
+    assert.equal(tr.getActiveAnchor(), 'top-right');
+    simulateMouseUp(tr, { x: 260, y: 100 });
+
+    // the box flipped across the right edge as usual
+    assertAlmostEqual(rect.x(), 260);
+    assertAlmostEqual(rect.y(), 100);
+    assertAlmostEqual(rect.scaleX(), 0.6);
+    assertAlmostEqual(rect.scaleY(), -1);
+    assertAlmostEqual(rect.rotation(), -180);
+  });
+
+  // padding makes the staged grab-offset shift non-zero, so this covers the
+  // offset half of the staged flip state (the padding-0 tests only cover the
+  // anchor rename)
+  it('rejected flip with padding keeps the grab offset intact', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+    stage.add(layer);
+
+    var rect = new Konva.Rect({
+      x: 100,
+      y: 100,
+      width: 100,
+      height: 100,
+      fill: 'yellow',
+    });
+    layer.add(rect);
+
+    var tr = new Konva.Transformer({
+      nodes: [rect],
+      keepRatio: false,
+      padding: 10,
+      boundBoxFunc: rejectNegativeBox,
+    });
+    layer.add(tr);
+    layer.draw();
+
+    // top-left anchor visual center is padding away from the corner
+    simulateMouseDown(tr, { x: 90, y: 90 });
+    var seenAnchors: Array<string | null> = [];
+    for (var x = 100; x <= 250; x += 10) {
+      simulateMouseMove(tr, { x: x, y: 90 });
+      seenAnchors.push(tr.getActiveAnchor());
+    }
+    simulateMouseUp(tr, { x: 250, y: 90 });
+
+    seenAnchors.forEach((anchor) => {
+      assert.equal(anchor, 'top-left', 'rejected flip must not rename anchor');
+    });
+
+    assertAlmostEqual(rect.x(), 190);
+    assertAlmostEqual(rect.y(), 100);
+    assertAlmostEqual(rect.scaleX(), 0.1);
+    assertAlmostEqual(rect.scaleY(), 1);
+  });
+
+  it('rejected flip with keepRatio keeps the corner anchor stable', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+    stage.add(layer);
+
+    var rect = new Konva.Rect({
+      x: 100,
+      y: 100,
+      width: 200,
+      height: 40,
+      fill: 'yellow',
+    });
+    layer.add(rect);
+
+    var tr = new Konva.Transformer({
+      nodes: [rect],
+      boundBoxFunc: rejectNegativeBox,
+    });
+    layer.add(tr);
+    layer.draw();
+
+    // grab the bottom-right anchor and drag it up, past the top edge
+    simulateMouseDown(tr, { x: 300, y: 140 });
+    var seenAnchors: Array<string | null> = [];
+    for (var y = 130; y >= 60; y -= 10) {
+      simulateMouseMove(tr, { x: 300, y: y });
+      seenAnchors.push(tr.getActiveAnchor());
+    }
+    simulateMouseUp(tr, { x: 300, y: 60 });
+
+    seenAnchors.forEach((anchor) => {
+      assert.equal(
+        anchor,
+        'bottom-right',
+        'rejected flip must not rename anchor'
+      );
+    });
+
+    // the box holds the last accepted proportional size
+    assertAlmostEqual(rect.x(), 100);
+    assertAlmostEqual(rect.y(), 100);
+    assertAlmostEqual(rect.scaleX(), 0.9805806756909199);
+    assertAlmostEqual(rect.scaleY(), 0.9805806756909199);
     assertAlmostEqual(rect.rotation(), 0);
   });
 

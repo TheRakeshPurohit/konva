@@ -5,6 +5,9 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+- Fixed `pointerclick` firing after a drag and drop, while `click` correctly did not
+- Fixed `Transformer` shaking the shape when a corner anchor with `keepRatio` was dragged across the shape with `padding` enabled
+- Fixed `Transformer` switching its active anchor when `boundBoxFunc` rejects a flip. A rejected flip now keeps the grabbed anchor active, so resizing keeps following the pointer — and `getActiveAnchor()` inside `boundBoxFunc` now reports the anchor being held instead of the prematurely flipped one
 - Fixed drag and drop of a stage rendered in another window than the one Konva was imported into - an iframe, or a window opened with `window.open`. Such a stage now uses the pointer events of its own window, and a pointer move in another window no longer drags its nodes
 - Fixed `Transformer` of such a stage, which got no pointer move or release events at all
 - Fixed `layer.batchDraw()` of such a stage, which asked the window Konva was imported into for the frame and stopped drawing when that window was not visible
