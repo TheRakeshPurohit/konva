@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
-## Unreleased
+## 10.3.2 (2026-08-26)
 
 - Reduced canvas memory usage, most of all for non-interactive scenes. A layer with `listening: false` (and every layer of a non-listening stage) now releases its stage-sized hit canvas instead of keeping it allocated, and re-creates it when it starts listening again. The two stage-sized buffer canvases of every `Konva.Stage` are now created empty and only allocated by the first feature that needs them ("perfect drawing" and `shape.intersects()`). `node.cache()` of a non-listening node skips its cached hit canvas the same way, building it only if the node starts listening (previously such a node kept an empty cached hit graph and stayed unhittable until re-cached). Note: after turning `listening` back on, the hit graph appears on the next layer draw (automatic unless `Konva.autoDrawEnabled` is off - then call `layer.draw()`, as a single `shape.draw()` is not enough to re-create the layer hit canvas)
 - Fixed `charRenderFunc` of `Konva.Text` ignoring `fillStyle`/`strokeStyle` set on the context by the callback. A style set for a character now wins over the shape attributes for that character, as documented
