@@ -1967,6 +1967,43 @@ describe('Text', function () {
     }
   });
 
+  it('charRenderFunc can change character fill and stroke color', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+    stage.add(layer);
+
+    var text = new Konva.Text({
+      x: 10,
+      y: 10,
+      text: 'AB',
+      fontSize: 20,
+      fill: 'black',
+      stroke: 'blue',
+      charRenderFunc: function (props) {
+        if (props.index === 1) {
+          props.context.fillStyle = 'red';
+          props.context.strokeStyle = 'green';
+        }
+      },
+    });
+    layer.add(text);
+    layer.draw();
+
+    var trace = layer.getContext().getTrace();
+
+    if (Konva._renderBackend === 'skia-canvas') {
+      assert.equal(
+        trace,
+        'clearRect(0,0,578,200);clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 20px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();save();fillStyle=black;fillText(A,0,16.934);lineWidth=2;strokeStyle=blue;miterLimit=2;strokeText(A,0,16.934);restore();save();fillStyle=black;fillStyle=#ff0000;fillText(B,13.34,16.934);lineWidth=2;strokeStyle=blue;miterLimit=2;strokeStyle=#008000;strokeText(B,13.34,16.934);restore();restore();restore();'
+      );
+    } else {
+      assert.equal(
+        trace,
+        'clearRect(0,0,578,200);clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 20px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();save();fillStyle=black;fillText(A,0,17);lineWidth=2;strokeStyle=blue;miterLimit=2;strokeText(A,0,17);restore();save();fillStyle=black;fillStyle=#ff0000;fillText(B,13.34,17);lineWidth=2;strokeStyle=blue;miterLimit=2;strokeStyle=#008000;strokeText(B,13.34,17);restore();restore();restore();'
+      );
+    }
+  });
+
   it('text decoration with letterSpacing and lineHeight', function () {
     var stage = addStage();
     var layer = new Konva.Layer();

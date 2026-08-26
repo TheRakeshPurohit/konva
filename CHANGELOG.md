@@ -5,6 +5,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+- Fixed `charRenderFunc` of `Konva.Text` ignoring `fillStyle`/`strokeStyle` set on the context by the callback. A style set for a character now wins over the shape attributes for that character, as documented
 - Fixed `setPointerCapture()` not capturing the pointer on the stage container, so the stage kept missing pointer events outside of its bounds. A captured pointer now keeps sending `pointermove`/`pointerup` to the stage beyond its edges, like pointer capture on plain HTML elements
 - Fixed `pointerclick` firing after a drag and drop, while `click` correctly did not
 - Fixed `Transformer` shaking the shape when a corner anchor with `keepRatio` was dragged across the shape with `padding` enabled

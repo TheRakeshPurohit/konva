@@ -189,10 +189,17 @@ function getDummyContext() {
 }
 
 function _fillFunc(this: Text, context: Context) {
+  // re-apply a per-character style set by charRenderFunc (see _sceneFunc)
+  if (this._partialFillStyle) {
+    context.setAttr('fillStyle', this._partialFillStyle);
+  }
   context.fillText(this._partialText, this._partialTextX, this._partialTextY);
 }
 function _strokeFunc(this: Text, context: Context) {
   context.setAttr('miterLimit', 2);
+  if (this._partialStrokeStyle) {
+    context.setAttr('strokeStyle', this._partialStrokeStyle);
+  }
   context.strokeText(this._partialText, this._partialTextX, this._partialTextY);
 }
 
@@ -247,6 +254,8 @@ export class Text extends Shape<TextConfig> {
   _partialText: string;
   _partialTextX = 0;
   _partialTextY = 0;
+  _partialFillStyle?: string | CanvasGradient | CanvasPattern;
+  _partialStrokeStyle?: string | CanvasGradient | CanvasPattern;
 
   textWidth: number;
   textHeight: number;
@@ -318,6 +327,12 @@ export class Text extends Shape<TextConfig> {
     }
 
     context.translate(padding, alignY + padding);
+
+    // context styles entering the loop, used to detect styles set by
+    // charRenderFunc; every character is drawn inside save()/restore(),
+    // so the entry state is the same for each one
+    const fillStyleBefore = charRenderFunc ? context.fillStyle : undefined;
+    const strokeStyleBefore = charRenderFunc ? context.strokeStyle : undefined;
 
     // draw text lines
     for (n = 0; n < textArrLen; n++) {
@@ -408,9 +423,22 @@ export class Text extends Shape<TextConfig> {
               width: this.measureSize(letter).width,
               context,
             });
+            // a style the callback set on the context wins for this character;
+            // fillStrokeShape() overwrites the context styles from the shape
+            // attributes, so stash them for _fillFunc/_strokeFunc to re-apply
+            const fillStyleAfter = context.fillStyle;
+            if (fillStyleAfter !== fillStyleBefore) {
+              this._partialFillStyle = fillStyleAfter;
+            }
+            const strokeStyleAfter = context.strokeStyle;
+            if (strokeStyleAfter !== strokeStyleBefore) {
+              this._partialStrokeStyle = strokeStyleAfter;
+            }
           }
           context.fillStrokeShape(this);
           if (charRenderFunc) {
+            this._partialFillStyle = undefined;
+            this._partialStrokeStyle = undefined;
             context.restore();
           }
           lineTranslateX += this.measureSize(letter).width + letterSpacing;
@@ -1130,10 +1158,11 @@ Factory.addGetterSetter(
  * @param {Function} charRenderFunc
  * @returns {Function}
  * @example
- * // apply small x-translation to every second character
+ * // apply small x-translation and a custom color to every second character
  * text.charRenderFunc(function(props) {
  *   if (props.index % 2 === 1) {
  *     props.context.translate(2, 0);
+ *     props.context.fillStyle = 'red';
  *   }
  * });
  */
