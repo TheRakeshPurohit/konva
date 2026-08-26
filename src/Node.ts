@@ -369,7 +369,11 @@ export abstract class Node<Config extends NodeConfig = NodeConfig> {
   clearCache() {
     if (this._cache.has(CANVAS)) {
       const { scene, filter, hit } = this._cache.get(CANVAS);
-      Util.releaseCanvas(scene._canvas, filter._canvas, hit._canvas);
+      Util.releaseCanvas(
+        scene._canvas,
+        filter._canvas,
+        ...(hit ? [hit._canvas] : [])
+      );
       this._cache.delete(CANVAS);
     }
 
@@ -493,13 +497,7 @@ export abstract class Node<Config extends NodeConfig = NodeConfig> {
         height: 0,
         willReadFrequently: true,
       }),
-      cachedHitCanvas = new HitCanvas({
-        pixelRatio: hitCanvasPixelRatio,
-        width: width,
-        height: height,
-      }),
-      sceneContext = cachedSceneCanvas.getContext(),
-      hitContext = cachedHitCanvas.getContext();
+      sceneContext = cachedSceneCanvas.getContext();
 
     const bufferCanvas = new SceneCanvas({
         // width and height already multiplied by pixelRatio
@@ -513,7 +511,6 @@ export abstract class Node<Config extends NodeConfig = NodeConfig> {
       }),
       bufferContext = bufferCanvas.getContext();
 
-    cachedHitCanvas.isCache = true;
     cachedSceneCanvas.isCache = true;
 
     this._cache.delete(CANVAS);
@@ -525,11 +522,9 @@ export abstract class Node<Config extends NodeConfig = NodeConfig> {
     }
 
     sceneContext.save();
-    hitContext.save();
     bufferContext.save();
 
     sceneContext.translate(-x, -y);
-    hitContext.translate(-x, -y);
     bufferContext.translate(-x, -y);
     // hard-code offset to make sure content fits canvas
     // @ts-ignore
@@ -543,11 +538,9 @@ export abstract class Node<Config extends NodeConfig = NodeConfig> {
     this._clearSelfAndDescendantCache(ABSOLUTE_SCALE);
 
     this.drawScene(cachedSceneCanvas, this, bufferCanvas);
-    this.drawHit(cachedHitCanvas, this);
     this._isUnderCache = false;
 
     sceneContext.restore();
-    hitContext.restore();
 
     // this will draw a red border around the cached box for
     // debugging purposes
@@ -569,7 +562,13 @@ export abstract class Node<Config extends NodeConfig = NodeConfig> {
     this._cache.set(CANVAS, {
       scene: cachedSceneCanvas,
       filter: cachedFilterCanvas,
-      hit: cachedHitCanvas,
+      // the hit canvas is built on demand (see _getCachedHitCanvas)
+      hit: null,
+      hitConfig: {
+        pixelRatio: hitCanvasPixelRatio,
+        width: width,
+        height: height,
+      },
       x: x,
       y: y,
     });
@@ -577,6 +576,33 @@ export abstract class Node<Config extends NodeConfig = NodeConfig> {
     this._requestDraw();
 
     return this;
+  }
+  // build the hit canvas of a cached node lazily - only when the hit graph
+  // is actually needed, so a non-listening node never allocates it
+  // https://github.com/konvajs/konva/issues/2009
+  _getCachedHitCanvas(top?: Node): HitCanvas | null {
+    // top === this means the node is drawing into its own cache right now:
+    // the build below re-enters drawHit for this very node, and consulting
+    // the not-yet-stored canvas again would recurse forever
+    if (top === this) {
+      return null;
+    }
+    const cache = this._getCanvasCache();
+    if (!cache) {
+      return null;
+    }
+    if (cache.hit) {
+      return cache.hit;
+    }
+    const hitCanvas = new HitCanvas(cache.hitConfig);
+    hitCanvas.isCache = true;
+    const hitContext = hitCanvas.getContext();
+    hitContext.save();
+    hitContext.translate(-cache.x, -cache.y);
+    this.drawHit(hitCanvas, this);
+    hitContext.restore();
+    cache.hit = hitCanvas;
+    return hitCanvas;
   }
 
   /**
@@ -687,9 +713,8 @@ export abstract class Node<Config extends NodeConfig = NodeConfig> {
     );
     context.restore();
   }
-  _drawCachedHitCanvas(context: Context) {
-    const canvasCache = this._getCanvasCache(),
-      hitCanvas = canvasCache.hit;
+  _drawCachedHitCanvas(context: Context, hitCanvas: HitCanvas) {
+    const canvasCache = this._getCanvasCache();
     context.save();
     context.translate(canvasCache.x, canvasCache.y);
     context.drawImage(
@@ -3367,6 +3392,8 @@ addGetterSetter(Node, 'listening', true, getBooleanValidator());
  *   by taking into account its parents, use the isListening() method
  *   nodes with listening set to false will not be detected in hit graph
  *   so they will be ignored in container.getIntersection() method
+ *   a non-listening layer (or a layer of a non-listening stage) also
+ *   releases its hit canvas, so it uses less memory
  * @name Konva.Node#listening
  * @method
  * @param {Boolean} listening Can be true, or false.  The default is true.

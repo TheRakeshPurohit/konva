@@ -3360,9 +3360,11 @@ describe('Node', function () {
       });
 
     assert.notEqual(circle._getCanvasCache().scene, undefined);
-    assert.notEqual(circle._getCanvasCache().hit, undefined);
 
     layer.draw();
+
+    // the hit canvas of a cache is built on the first hit draw
+    assert.notEqual(circle._getCanvasCache().hit, undefined);
 
     //document.body.appendChild(circle._getCanvasCache().scene._canvas);
     // document.body.appendChild(circle._getCanvasCache().hit._canvas);
@@ -3407,10 +3409,11 @@ describe('Node', function () {
     stage.add(layer);
 
     assert(group._getCanvasCache().scene);
-    assert(group._getCanvasCache().hit);
 
     layer.add(group);
     layer.draw();
+    // the hit canvas of a cache is built on the first hit draw
+    assert(group._getCanvasCache().hit);
     showHit(layer);
     var shape = stage.getIntersection({
       x: 5,

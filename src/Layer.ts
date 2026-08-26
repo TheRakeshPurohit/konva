@@ -217,9 +217,20 @@ export class Layer extends Container<Group | Shape> {
   }
   setSize({ width, height }) {
     this.canvas.setSize(width, height);
-    this.hitCanvas.setSize(width, height);
+    this._syncHitCanvasSize();
     this._setSmoothEnabled();
     return this;
+  }
+  // the hit canvas is only allocated while the layer is listening;
+  // for a non-listening layer it is kept released (0x0), so a purely
+  // presentational layer does not pay for a stage-sized hit bitmap
+  // https://github.com/konvajs/konva/issues/2009
+  _syncHitCanvasSize() {
+    const listening = this.isListening();
+    this.hitCanvas.setSizeIfChanged(
+      (listening ? this.getWidth() : 0) || 0,
+      (listening ? this.getHeight() : 0) || 0
+    );
   }
   _validateAdd(child) {
     const type = child.getType();
@@ -359,6 +370,11 @@ export class Layer extends Container<Group | Shape> {
     }
   }
   _getIntersection(pos: Vector2d): { shape?: Shape; antialiased?: boolean } {
+    // a non-listening layer keeps its hit canvas released (0x0),
+    // and a just-enabled layer may not have drawn its hit graph yet
+    if (!this.hitCanvas.width || !this.hitCanvas.height) {
+      return {};
+    }
     const ratio = this.hitCanvas.pixelRatio;
     const p = this.hitCanvas.context.getImageData(
       Math.round(pos.x * ratio),
@@ -414,8 +430,13 @@ export class Layer extends Container<Group | Shape> {
     const layer = this.getLayer(),
       canvas = can || (layer && layer.hitCanvas);
 
-    if (layer && layer.clearBeforeDraw()) {
-      layer.getHitCanvas().getContext().clear();
+    if (!can && layer) {
+      // allocate or release the hit canvas to match the current listening
+      // state - this also picks up a listening change made after the last draw
+      layer._syncHitCanvasSize();
+      if (layer.clearBeforeDraw()) {
+        layer.getHitCanvas().getContext().clear();
+      }
     }
 
     Container.prototype.drawHit.call(this, canvas, top);

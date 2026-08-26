@@ -1535,4 +1535,54 @@ describe('Stage', function () {
     Konva.Util.warn = oldWarn;
     assert.equal(called, true);
   });
+
+  // ======================================================
+  it('buffer canvases are allocated lazily, on first use', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+    stage.add(layer);
+    var rect = new Konva.Rect({
+      x: 10,
+      y: 10,
+      width: 50,
+      height: 50,
+      fill: 'red',
+    });
+    layer.add(rect);
+    layer.draw();
+
+    assert.equal(stage.bufferCanvas.width, 0, 'buffer canvas not allocated');
+    assert.equal(
+      stage.bufferHitCanvas.width,
+      0,
+      'buffer hit canvas not allocated'
+    );
+
+    // shape.intersects() is the feature that needs the buffer hit canvas
+    assert.equal(rect.intersects({ x: 20, y: 20 }), true);
+    assert.equal(
+      stage.bufferHitCanvas.width,
+      stage.width(),
+      'buffer hit canvas allocated by intersects()'
+    );
+
+    // "perfect drawing" (fill + stroke + opacity) needs the buffer canvas
+    rect.stroke('black');
+    rect.opacity(0.5);
+    layer.draw();
+    assert.equal(
+      stage.bufferCanvas.width,
+      stage.width() * stage.bufferCanvas.pixelRatio,
+      'buffer canvas allocated by perfect drawing'
+    );
+
+    // after a stage resize an allocated buffer re-syncs on next use
+    stage.width(stage.width() + 50);
+    assert.equal(rect.intersects({ x: 20, y: 20 }), true);
+    assert.equal(
+      stage.bufferHitCanvas.width,
+      stage.width(),
+      'buffer hit canvas follows the stage size'
+    );
+  });
 });

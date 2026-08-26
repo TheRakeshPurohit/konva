@@ -428,14 +428,18 @@ export class Stage extends Container<Layer, StageConfig> {
       this.content.style.height = height + PX;
     }
 
-    this.bufferCanvas.setSize(width, height);
-    this.bufferHitCanvas.setSize(width, height);
-
     // set layer dimensions
     this.children.forEach((layer) => {
       layer.setSize({ width, height });
       layer.draw();
     });
+  }
+  // "perfect drawing" uses bufferCanvas, shape.intersects() uses
+  // bufferHitCanvas; both are lazy - created at 0x0 and sized to the stage
+  // on first use
+  _syncBufferSize<T extends SceneCanvas | HitCanvas>(canvas: T): T {
+    canvas.setSizeIfChanged(this.width(), this.height());
+    return canvas;
   }
   add(layer: Layer, ...rest) {
     if (arguments.length > 1) {
@@ -953,14 +957,16 @@ export class Stage extends Container<Layer, StageConfig> {
     };
   }
   _buildDOM() {
+    // lazy buffer canvases, see _syncBufferSize
+    // https://github.com/konvajs/konva/issues/2009
     this.bufferCanvas = new SceneCanvas({
-      width: this.width(),
-      height: this.height(),
+      width: 0,
+      height: 0,
     });
     this.bufferHitCanvas = new HitCanvas({
       pixelRatio: 1,
-      width: this.width(),
-      height: this.height(),
+      width: 0,
+      height: 0,
     });
 
     if (!Konva.isBrowser) {

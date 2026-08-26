@@ -379,14 +379,13 @@ export abstract class Container<
     const layer = this.getLayer()!,
       canvas = can || (layer && layer.hitCanvas),
       context = canvas && canvas.getContext(),
-      cachedCanvas = this._getCanvasCache(),
-      cachedHitCanvas = cachedCanvas && cachedCanvas.hit;
+      cachedHitCanvas = this._getCachedHitCanvas(top);
 
     if (cachedHitCanvas) {
       context.save();
       const m = this.getAbsoluteTransform(top).getMatrix();
       context.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
-      this._drawCachedHitCanvas(context);
+      this._drawCachedHitCanvas(context, cachedHitCanvas);
       context.restore();
     } else {
       this._drawChildren('drawHit', canvas, top);

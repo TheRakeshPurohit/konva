@@ -464,7 +464,7 @@ export class Shape<
     if (!stage) {
       return false;
     }
-    const bufferHitCanvas = stage.bufferHitCanvas;
+    const bufferHitCanvas = stage._syncBufferSize(stage.bufferHitCanvas);
 
     bufferHitCanvas.getContext().clear();
     this.drawHit(bufferHitCanvas, undefined, true);
@@ -643,7 +643,7 @@ export class Shape<
     // if buffer canvas is needed
     if (this._useBufferCanvas() && !skipBuffer) {
       stage = this.getStage();
-      const bc = bufferCanvas || stage.bufferCanvas;
+      const bc = bufferCanvas || stage._syncBufferSize(stage.bufferCanvas);
       const bufferContext = bc.getContext();
       // When caching, the buffer canvas may have a translation applied.
       // We need to reset the transform before clearing to ensure the entire canvas is cleared.
@@ -728,8 +728,7 @@ export class Shape<
       canvas = can || layer!.hitCanvas,
       context = canvas && canvas.getContext(),
       drawFunc = this.hitFunc() || this.sceneFunc(),
-      cachedCanvas = this._getCanvasCache(),
-      cachedHitCanvas = cachedCanvas && cachedCanvas.hit;
+      cachedHitCanvas = this._getCachedHitCanvas(top);
 
     if (!this.colorKey) {
       Util.warn(
@@ -743,7 +742,7 @@ export class Shape<
       const m = this.getAbsoluteTransform(top).getMatrix();
       context.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
 
-      this._drawCachedHitCanvas(context);
+      this._drawCachedHitCanvas(context, cachedHitCanvas);
       context.restore();
       return this;
     }
@@ -776,9 +775,8 @@ export class Shape<
    * shape.drawHitFromCache();
    */
   drawHitFromCache(alphaThreshold = 0) {
-    const cachedCanvas = this._getCanvasCache(),
-      sceneCanvas = this._getCachedSceneCanvas(),
-      hitCanvas = cachedCanvas.hit,
+    const sceneCanvas = this._getCachedSceneCanvas(),
+      hitCanvas = this._getCachedHitCanvas()!,
       hitContext = hitCanvas.getContext(),
       hitWidth = hitCanvas.getWidth(),
       hitHeight = hitCanvas.getHeight();

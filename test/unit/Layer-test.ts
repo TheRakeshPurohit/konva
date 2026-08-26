@@ -451,4 +451,77 @@ describe('Layer', function () {
       done();
     });
   });
+
+  // ======================================================
+  it('hit canvas of a non-listening layer is not allocated', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer({ listening: false });
+    layer.add(
+      new Konva.Rect({ x: 10, y: 10, width: 50, height: 50, fill: 'red' })
+    );
+    stage.add(layer);
+    layer.draw();
+
+    assert.equal(layer.hitCanvas.width, 0, 'hit canvas stays released');
+    assert.equal(layer.hitCanvas.height, 0, 'hit canvas stays released');
+    assert.equal(
+      layer.canvas.width,
+      stage.width() * layer.canvas.pixelRatio,
+      'scene canvas is sized as usual'
+    );
+    assert.equal(layer.getIntersection({ x: 20, y: 20 }), null);
+  });
+
+  // ======================================================
+  it('hit canvas is allocated when a layer starts listening and released when it stops', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer({ listening: false });
+    var rect = new Konva.Rect({
+      x: 10,
+      y: 10,
+      width: 50,
+      height: 50,
+      fill: 'red',
+    });
+    layer.add(rect);
+    stage.add(layer);
+    layer.draw();
+    assert.equal(layer.hitCanvas.width, 0);
+
+    layer.listening(true);
+    layer.draw();
+    assert.equal(layer.hitCanvas.width, stage.width(), 'hit canvas allocated');
+    assert.equal(layer.hitCanvas.height, stage.height());
+    assert.equal(layer.getIntersection({ x: 20, y: 20 }), rect);
+
+    layer.listening(false);
+    layer.draw();
+    assert.equal(layer.hitCanvas.width, 0, 'hit canvas released again');
+    assert.equal(layer.getIntersection({ x: 20, y: 20 }), null);
+  });
+
+  // ======================================================
+  it('stage.listening(false) releases the hit canvases of its layers', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+    var rect = new Konva.Rect({
+      x: 10,
+      y: 10,
+      width: 50,
+      height: 50,
+      fill: 'red',
+    });
+    layer.add(rect);
+    stage.add(layer);
+    assert.equal(layer.hitCanvas.width, stage.width());
+
+    stage.listening(false);
+    layer.draw();
+    assert.equal(layer.hitCanvas.width, 0, 'inherited listening releases hit');
+
+    stage.listening(true);
+    layer.draw();
+    assert.equal(layer.hitCanvas.width, stage.width());
+    assert.equal(layer.getIntersection({ x: 20, y: 20 }), rect);
+  });
 });

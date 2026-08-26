@@ -1612,4 +1612,101 @@ describe('Caching', function () {
     // Compare
     compareLayers(layer, layerNonCached, 50);
   });
+
+  // ======================================================
+  it('cache of a non-listening node has no hit canvas', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+    stage.add(layer);
+    var rect = new Konva.Rect({
+      x: 100,
+      y: 50,
+      width: 100,
+      height: 100,
+      fill: 'green',
+      listening: false,
+    });
+    layer.add(rect);
+    rect.cache();
+    layer.draw();
+
+    assert.equal(rect._getCanvasCache().hit, null, 'no hit canvas built');
+    assert.equal(
+      rect._getCanvasCache().scene.width > 0,
+      true,
+      'scene canvas cached as usual'
+    );
+    assert.equal(stage.getIntersection({ x: 150, y: 100 }), null);
+  });
+
+  // ======================================================
+  it('cached node builds its hit canvas when it starts listening', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+    stage.add(layer);
+    var rect = new Konva.Rect({
+      x: 100,
+      y: 50,
+      width: 100,
+      height: 100,
+      fill: 'green',
+      listening: false,
+    });
+    layer.add(rect);
+    rect.cache();
+    layer.draw();
+    assert.equal(rect._getCanvasCache().hit, null);
+
+    rect.listening(true);
+    layer.draw();
+
+    assert(rect._getCanvasCache().hit, 'hit canvas built');
+    assert.equal(stage.getIntersection({ x: 150, y: 100 }), rect);
+  });
+
+  // ======================================================
+  it('shape.intersects() works on a cached shape', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+    stage.add(layer);
+    var rect = new Konva.Rect({
+      x: 100,
+      y: 50,
+      width: 100,
+      height: 100,
+      fill: 'green',
+    });
+    layer.add(rect);
+    layer.draw();
+    rect.cache();
+
+    // intersects() needs the cached hit graph before any layer draw,
+    // triggering the lazy build from inside another hit draw
+    assert.equal(rect.intersects({ x: 150, y: 100 }), true);
+    assert.equal(rect.intersects({ x: 50, y: 180 }), false);
+  });
+
+  // ======================================================
+  it('cached group with a cached child hit-tests correctly', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+    stage.add(layer);
+    var group = new Konva.Group();
+    var rect = new Konva.Rect({
+      x: 100,
+      y: 50,
+      width: 100,
+      height: 100,
+      fill: 'green',
+    });
+    group.add(rect);
+    layer.add(group);
+    rect.cache();
+    group.cache({ x: 0, y: 0, width: 300, height: 200 });
+    layer.draw();
+
+    // the group hit build runs the child's own lazy hit build nested in it
+    assert.equal(stage.getIntersection({ x: 150, y: 100 }), rect);
+    assert.equal(stage.getIntersection({ x: 20, y: 20 }), null);
+  });
 });

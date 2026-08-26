@@ -142,6 +142,16 @@ export class Canvas {
     this.setWidth(width || 0);
     this.setHeight(height || 0);
   }
+  // setSize() re-allocates and clears the canvas even for the same size,
+  // so lazily sized canvases use this to stay untouched when nothing changed
+  setSizeIfChanged(width: number, height: number) {
+    if (
+      this.width !== width * this.pixelRatio ||
+      this.height !== height * this.pixelRatio
+    ) {
+      this.setSize(width, height);
+    }
+  }
   /**
    * to data url
    * @method
