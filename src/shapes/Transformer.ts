@@ -823,8 +823,14 @@ export class Transformer extends Group {
 
     let centeredScaling = this.centeredScaling() || e.altKey;
 
+    // with keepRatio, a corner anchor doesn't follow the pointer — the blocks
+    // below project it onto the ratio diagonal. _doFitNodesInto must know
+    // that to skip the padding flip compensation (issue #1878)
+    let anchorProjected = false;
+
     if (this._movingAnchorName === 'top-left') {
       if (keepProportion) {
+        anchorProjected = true;
         const comparePoint = centeredScaling
           ? {
               x: this.width() / 2,
@@ -855,6 +861,7 @@ export class Transformer extends Group {
       this.findOne('.top-left')!.y(anchorNode.y());
     } else if (this._movingAnchorName === 'top-right') {
       if (keepProportion) {
+        anchorProjected = true;
         const comparePoint = centeredScaling
           ? {
               x: this.width() / 2,
@@ -891,6 +898,7 @@ export class Transformer extends Group {
       this.findOne('.bottom-right')!.x(anchorNode.x());
     } else if (this._movingAnchorName === 'bottom-left') {
       if (keepProportion) {
+        anchorProjected = true;
         const comparePoint = centeredScaling
           ? {
               x: this.width() / 2,
@@ -925,6 +933,7 @@ export class Transformer extends Group {
       this.findOne('.bottom-right')!.y(anchorNode.y());
     } else if (this._movingAnchorName === 'bottom-right') {
       if (keepProportion) {
+        anchorProjected = true;
         const comparePoint = centeredScaling
           ? {
               x: this.width() / 2,
@@ -1001,7 +1010,8 @@ export class Transformer extends Group {
         height: height,
         rotation: Konva.getAngle(this.rotation()),
       },
-      e
+      e,
+      anchorProjected
     );
   }
   _handleMouseUp(e) {
@@ -1037,20 +1047,20 @@ export class Transformer extends Group {
       this._movingAnchorName = null;
     }
   }
-  _fitNodesInto(newAttrs, evt?) {
+  _fitNodesInto(newAttrs, evt?, anchorProjected = false) {
     // Perf: suspend autoDraw for the whole method so per-attr _setAttr writes
     // don't each trigger _requestDraw -> getLayer parent-chain walks.
     // batchDraw per affected layer is issued at the end.
     const prevAutoDraw = Konva.autoDrawEnabled;
     Konva.autoDrawEnabled = false;
     try {
-      return this._doFitNodesInto(newAttrs, evt);
+      return this._doFitNodesInto(newAttrs, evt, anchorProjected);
     } finally {
       Konva.autoDrawEnabled = prevAutoDraw;
     }
   }
 
-  _doFitNodesInto(newAttrs, evt?) {
+  _doFitNodesInto(newAttrs, evt?, anchorProjected = false) {
     const oldAttrs = this._getNodeRect();
 
     const minSize = 1;
@@ -1068,18 +1078,25 @@ export class Transformer extends Group {
 
     const t = new Transform();
     t.rotate(Konva.getAngle(this.rotation()));
+    // the ±2*padding shifts below assume the box size passed through zero
+    // continuously (the anchor tied to the pointer). A projected anchor snaps
+    // the box across zero instead; the shifts then leave the drag state
+    // inconsistent with the real anchor position and the box flips back and
+    // forth on every following move (issue #1878) — so flip only the anchor
+    // name, exactly as when padding is 0.
+    const flipPadding = anchorProjected ? 0 : this.padding() * 2;
     if (
       this._movingAnchorName &&
       newAttrs.width < 0 &&
       this._movingAnchorName.indexOf('left') >= 0
     ) {
       const offset = t.point({
-        x: -this.padding() * 2,
+        x: -flipPadding,
         y: 0,
       });
       newAttrs.x += offset.x;
       newAttrs.y += offset.y;
-      newAttrs.width += this.padding() * 2;
+      newAttrs.width += flipPadding;
       this._movingAnchorName = this._movingAnchorName.replace('left', 'right');
       this._anchorDragOffset.x -= offset.x;
       this._anchorDragOffset.y -= offset.y;
@@ -1089,13 +1106,13 @@ export class Transformer extends Group {
       this._movingAnchorName.indexOf('right') >= 0
     ) {
       const offset = t.point({
-        x: this.padding() * 2,
+        x: flipPadding,
         y: 0,
       });
       this._movingAnchorName = this._movingAnchorName.replace('right', 'left');
       this._anchorDragOffset.x -= offset.x;
       this._anchorDragOffset.y -= offset.y;
-      newAttrs.width += this.padding() * 2;
+      newAttrs.width += flipPadding;
     }
     if (
       this._movingAnchorName &&
@@ -1104,14 +1121,14 @@ export class Transformer extends Group {
     ) {
       const offset = t.point({
         x: 0,
-        y: -this.padding() * 2,
+        y: -flipPadding,
       });
       newAttrs.x += offset.x;
       newAttrs.y += offset.y;
       this._movingAnchorName = this._movingAnchorName.replace('top', 'bottom');
       this._anchorDragOffset.x -= offset.x;
       this._anchorDragOffset.y -= offset.y;
-      newAttrs.height += this.padding() * 2;
+      newAttrs.height += flipPadding;
     } else if (
       this._movingAnchorName &&
       newAttrs.height < 0 &&
@@ -1119,12 +1136,12 @@ export class Transformer extends Group {
     ) {
       const offset = t.point({
         x: 0,
-        y: this.padding() * 2,
+        y: flipPadding,
       });
       this._movingAnchorName = this._movingAnchorName.replace('bottom', 'top');
       this._anchorDragOffset.x -= offset.x;
       this._anchorDragOffset.y -= offset.y;
-      newAttrs.height += this.padding() * 2;
+      newAttrs.height += flipPadding;
     }
 
     if (this.boundBoxFunc()) {

@@ -1697,6 +1697,56 @@ describe('Transformer', function () {
     simulateMouseUp(tr);
   });
 
+  // https://github.com/konvajs/konva/issues/1878
+  // dragging a corner anchor across the box with keepRatio + padding made the
+  // active anchor flip back and forth on every move, shaking the shape
+  it('no oscillation when corner anchor with keepRatio crosses the box with padding', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+    stage.add(layer);
+
+    var rect = new Konva.Rect({
+      x: 100,
+      y: 100,
+      width: 200,
+      height: 40,
+      fill: 'yellow',
+    });
+    layer.add(rect);
+
+    var tr = new Konva.Transformer({
+      nodes: [rect],
+      padding: 5,
+    });
+    layer.add(tr);
+    layer.draw();
+
+    // grab the bottom-right anchor (visual center is padding away from the
+    // corner) and drag straight up across the top edge in small steps
+    simulateMouseDown(tr, { x: 305, y: 145 });
+
+    var prevAnchor = tr.getActiveAnchor();
+    var anchorFlips = 0;
+    for (var y = 143; y >= 55; y -= 2) {
+      simulateMouseMove(tr, { x: 305, y: y });
+      if (tr.getActiveAnchor() !== prevAnchor) {
+        anchorFlips += 1;
+      }
+      prevAnchor = tr.getActiveAnchor();
+    }
+    simulateMouseUp(tr, { x: 305, y: 55 });
+
+    // crossing the top edge flips bottom-right -> top-right exactly once
+    assert.equal(anchorFlips, 1, 'anchor should flip exactly once');
+
+    // the box ends mirrored above its top edge
+    assertAlmostEqual(rect.x(), 100);
+    assertAlmostEqual(rect.y(), 100);
+    assertAlmostEqual(rect.scaleX(), 1.0107594250783);
+    assertAlmostEqual(rect.scaleY(), -1.0107594250783);
+    assertAlmostEqual(rect.rotation(), 0);
+  });
+
   it('switch horizontal scaling with (top-left anchor)', function () {
     var stage = addStage();
     var layer = new Konva.Layer();
