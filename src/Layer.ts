@@ -20,8 +20,7 @@ export interface LayerConfig extends ContainerConfig {
 }
 
 // constants
-const HASH = '#',
-  BEFORE_DRAW = 'beforeDraw',
+const BEFORE_DRAW = 'beforeDraw',
   DRAW = 'draw',
   /*
    * 2 - 3 - 4
