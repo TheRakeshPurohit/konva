@@ -1,7 +1,7 @@
 {
   "name": "konva",
   "version": "10.3.2",
-  "description": "HTML5 2d canvas library.",
+  "description": "HTML5 2d canvas library for interactive graphics, design editors, whiteboards, and diagrams.",
   "author": "Anton Lavrenov",
   "type": "module",
   "files": [
@@ -131,9 +131,16 @@
   },
   "keywords": [
     "canvas",
-    "animations",
-    "graphic",
-    "html5"
+    "html5",
+    "2d",
+    "graphics",
+    "animation",
+    "drag-and-drop",
+    "design-editor",
+    "canvas-editor",
+    "whiteboard",
+    "transformer",
+    "konva"
   ],
   "prettier": {
     "singleQuote": true,
@@ -142,7 +149,7 @@
   "bugs": {
     "url": "https://github.com/konvajs/konva/issues"
   },
-  "homepage": "http://konvajs.org/",
+  "homepage": "https://konvajs.org/",
   "readmeFilename": "README.md",
   "repository": {
     "type": "git",

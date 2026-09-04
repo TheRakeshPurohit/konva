@@ -56,6 +56,8 @@ layer.add(box);
 stage.add(layer);
 ```
 
+> **Building a full design editor?** [Polotno](https://polotno.com/?utm_source=konvajs&utm_medium=readme&utm_content=konva) is a commercial design editor SDK built on Konva by the Konva maintainers. It ships templates, text editing, and export, so you integrate an editor instead of building one: `npm install polotno`.
+
 # Browsers support
 
 Konva works in modern mobile and desktop browsers that support ES2015.
@@ -145,6 +147,8 @@ const stage = new Konva.Stage({
 ```
 
 # Backers
+
+Konva is maintained by the team behind [Polotno](https://polotno.com/?utm_source=konvajs&utm_medium=readme&utm_content=konva-backers), a commercial design editor SDK built on Konva, which sponsors ongoing development.
 
 ![https://simpleshow.com](https://avatars.githubusercontent.com/u/99720652?s=200&v=4 'https://simpleshow.com')
 ![https://www.notably.ai/](https://avatars.githubusercontent.com/u/80046841?s=200&v=4 'https://www.notably.ai/')
